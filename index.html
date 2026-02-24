@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RW Financial Analyst v2.1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;height:100vh;display:flex;flex-direction:column}
+  header{background:#1a1f2e;border-bottom:1px solid #2d3448;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+  header h1{font-size:16px;font-weight:700;color:#7eb8f7;letter-spacing:.5px}
+  header span{font-size:11px;color:#64748b;background:#0f1117;padding:2px 8px;border-radius:10px;border:1px solid #2d3448}
+  .api-bar{background:#1a1f2e;border-bottom:1px solid #2d3448;padding:8px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .api-bar label{font-size:12px;color:#94a3b8;white-space:nowrap}
+  .api-bar input{flex:1;background:#0f1117;border:1px solid #2d3448;border-radius:6px;padding:5px 10px;color:#e2e8f0;font-size:12px;font-family:monospace}
+  .api-bar input:focus{outline:none;border-color:#7eb8f7}
+  .api-status{font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+  .api-status.ok{background:#14532d;color:#86efac}
+  .api-status.missing{background:#450a0a;color:#fca5a5}
+  main{flex:1;display:flex;overflow:hidden}
+  .left{width:380px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid #2d3448;background:#13182a}
+  .panel-header{padding:10px 16px;font-size:12px;font-weight:600;color:#94a3b8;border-bottom:1px solid #2d3448;background:#1a1f2e;text-transform:uppercase;letter-spacing:.8px}
+  .upload-zone{margin:12px;border:2px dashed #2d3448;border-radius:10px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#0f1117}
+  .upload-zone:hover,.upload-zone.drag{border-color:#7eb8f7;background:#0d1526}
+  .upload-zone p{font-size:13px;color:#64748b;margin-top:6px}
+  .upload-zone .icon{font-size:28px}
+  .upload-zone input{display:none}
+  .file-list{padding:0 12px;display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto}
+  .file-chip{display:flex;align-items:center;gap:8px;background:#1a1f2e;border:1px solid #2d3448;border-radius:8px;padding:6px 10px;font-size:12px}
+  .file-chip .fname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e2e8f0}
+  .file-chip .ftype{color:#7eb8f7;font-size:10px;background:#0f1117;padding:1px 6px;border-radius:6px;flex-shrink:0}
+  .file-chip .rem{cursor:pointer;color:#64748b;font-size:14px;line-height:1;flex-shrink:0}
+  .file-chip .rem:hover{color:#f87171}
+  .manual-toggle{margin:8px 12px 0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8}
+  .manual-toggle input{accent-color:#7eb8f7}
+  .manual-area{margin:8px 12px 0;display:none}
+  .manual-area textarea{width:100%;background:#0f1117;border:1px solid #2d3448;border-radius:8px;padding:10px;color:#e2e8f0;font-size:12px;resize:vertical;min-height:80px}
+  .manual-area textarea:focus{outline:none;border-color:#7eb8f7}
+  .chat-area{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .msg{display:flex;flex-direction:column;gap:4px}
+  .msg.user .bubble{background:#1e3a5f;border-radius:10px 10px 4px 10px;align-self:flex-end;max-width:90%}
+  .msg.assistant .bubble{background:#1a1f2e;border-radius:10px 10px 10px 4px;align-self:flex-start;max-width:95%;border:1px solid #2d3448}
+  .bubble{padding:10px 12px;font-size:13px;line-height:1.5}
+  .msg-label{font-size:10px;color:#475569;padding:0 4px}
+  .msg.user .msg-label{text-align:right}
+  .typing{display:flex;gap:4px;padding:10px 12px;background:#1a1f2e;border-radius:10px;border:1px solid #2d3448;align-self:flex-start}
+  .typing span{width:6px;height:6px;background:#7eb8f7;border-radius:50%;animation:bounce .8s infinite}
+  .typing span:nth-child(2){animation-delay:.15s}
+  .typing span:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+  .input-row{padding:10px 12px;border-top:1px solid #2d3448;display:flex;gap:8px;background:#1a1f2e}
+  .input-row textarea{flex:1;background:#0f1117;border:1px solid #2d3448;border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;resize:none;max-height:100px;font-family:inherit}
+  .input-row textarea:focus{outline:none;border-color:#7eb8f7}
+  .btn{background:#1e3a5f;border:none;border-radius:8px;padding:8px 14px;color:#7eb8f7;font-size:13px;cursor:pointer;font-weight:600;transition:background .2s;white-space:nowrap}
+  .btn:hover{background:#2a4a7f}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn-sm{font-size:12px;padding:5px 10px;border-radius:6px}
+  .btn-success{background:#14532d;color:#86efac;border:none}
+  .btn-success:hover{background:#166534}
+  .btn-danger{background:#450a0a;color:#fca5a5;border:none}
+  .btn-danger:hover{background:#7f1d1d}
+  .right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .report-toolbar{padding:8px 16px;background:#1a1f2e;border-bottom:1px solid #2d3448;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .report-toolbar .title{flex:1;font-size:12px;color:#64748b;min-width:120px}
+  .report-content{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column}
+  .report-editor{flex:1;background:transparent;border:none;color:#e2e8f0;font-family:'Courier New',monospace;font-size:13px;line-height:1.6;resize:none;outline:none;min-height:100%}
+  .report-preview{flex:1;font-size:13px;line-height:1.7;color:#e2e8f0}
+  .report-preview h1{font-size:18px;color:#7eb8f7;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #2d3448}
+  .report-preview h2{font-size:15px;color:#93c5fd;margin:20px 0 8px}
+  .report-preview h3{font-size:13px;color:#bfdbfe;margin:14px 0 6px}
+  .report-preview table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+  .report-preview th{background:#1a1f2e;color:#94a3b8;padding:6px 10px;text-align:left;border:1px solid #2d3448;font-size:11px}
+  .report-preview td{padding:6px 10px;border:1px solid #2d3448;vertical-align:top}
+  .report-preview tr:nth-child(even) td{background:#0d1120}
+  .report-preview strong{color:#f0f9ff}
+  .report-preview em{color:#cbd5e1}
+  .report-preview code{background:#1a1f2e;padding:1px 5px;border-radius:4px;font-size:12px;color:#7eb8f7}
+  .report-preview ul,.report-preview ol{padding-left:20px;margin:6px 0}
+  .report-preview li{margin:3px 0}
+  .report-preview p{margin:6px 0}
+  .report-preview hr{border:none;border-top:1px solid #2d3448;margin:16px 0}
+  .view-toggle{display:flex;gap:4px}
+  .view-btn{background:#0f1117;border:1px solid #2d3448;border-radius:6px;padding:4px 10px;color:#94a3b8;font-size:12px;cursor:pointer;transition:all .2s}
+  .view-btn.active{background:#1e3a5f;color:#7eb8f7;border-color:#3b5f99}
+  .empty-report{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#475569;gap:10px;text-align:center}
+  .empty-report .big{font-size:40px}
+  .empty-report p{font-size:13px}
+  /* Export modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
+  .modal-overlay.show{display:flex}
+  .modal{background:#1a1f2e;border:1px solid #2d3448;border-radius:14px;padding:28px 32px;max-width:420px;width:90%;display:flex;flex-direction:column;gap:16px}
+  .modal h2{font-size:16px;color:#7eb8f7}
+  .modal p{font-size:13px;color:#94a3b8;line-height:1.6}
+  .modal .filename{background:#0f1117;border:1px solid #3b5f99;border-radius:8px;padding:10px 14px;font-size:13px;color:#7eb8f7;font-family:monospace;word-break:break-all}
+  .modal-btns{display:flex;gap:10px;justify-content:flex-end}
+  ::-webkit-scrollbar{width:6px}
+  ::-webkit-scrollbar-track{background:#0f1117}
+  ::-webkit-scrollbar-thumb{background:#2d3448;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏢 RW Financial Analyst</h1>
+  <span>v2.1</span>
+</header>
+<div class="api-bar">
+  <label>Anthropic API Key:</label>
+  <input type="password" id="apiKey" placeholder="sk-ant-..." oninput="checkKey()"/>
+  <span class="api-status missing" id="apiStatus">No Key</span>
+</div>
+<main>
+  <div class="left">
+    <div class="panel-header">📁 Upload Reports</div>
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+         ondragover="ev(event,'drag')" ondragleave="ev(event,'nodrag')" ondrop="handleDrop(event)">
+      <div class="icon">📄</div>
+      <p>Drop PDF / Excel files here<br>or click to browse</p>
+      <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.csv" onchange="handleFiles(this.files)"/>
+    </div>
+    <div class="file-list" id="fileList"></div>
+    <label class="manual-toggle">
+      <input type="checkbox" id="manualToggle" onchange="toggleManual()"/>
+      Enter manual data / notes
+    </label>
+    <div class="manual-area" id="manualArea">
+      <textarea id="manualText" placeholder="Paste additional data, notes, or context here..."></textarea>
+    </div>
+    <div class="panel-header" style="margin-top:10px">💬 Conversation</div>
+    <div class="chat-area" id="chatArea"></div>
+    <div class="input-row">
+      <textarea id="userInput" rows="1" placeholder="Ask a question or answer open items..."
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+      <button class="btn" id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="report-toolbar">
+      <span class="title" id="reportTitle">Report will appear here after first analysis</span>
+      <div class="view-toggle">
+        <button class="view-btn active" id="vPreview" onclick="setView('preview')">Preview</button>
+        <button class="view-btn" id="vEdit" onclick="setView('edit')">Edit</button>
+      </div>
+      <button class="btn btn-sm" id="copyBtn" onclick="copyReport()" style="display:none">📋 Copy</button>
+      <button class="btn btn-sm btn-success" id="finalizeBtn" onclick="promptFinalize()" style="display:none">✅ Finalize & Export</button>
+      <button class="btn btn-sm btn-danger" onclick="clearAll()">🗑 Reset</button>
+    </div>
+    <div class="report-content" id="reportContent">
+      <div class="empty-report" id="emptyReport">
+        <div class="big">📊</div>
+        <p>Upload reports and start the conversation<br>to generate your RiverWest analysis.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Export modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h2>📄 Finalize & Export Report</h2>
+    <p>Your report is ready to export. It will be saved as a Word document (.docx) with the following filename:</p>
+    <div class="filename" id="exportFilename"></div>
+    <p style="font-size:12px;color:#64748b">Please confirm the report is final before downloading. You can still return to edit if needed.</p>
+    <div class="modal-btns">
+      <button class="btn btn-sm" onclick="closeModal()">← Go Back</button>
+      <button class="btn btn-sm btn-success" onclick="doExport()">⬇ Download Word File</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = {files:[], history:[], report:'', view:'preview', exportMeta:{month:'', year:'', property:''}};
+
+// ── Detect report metadata from content ──────────────────────────────────
+function extractMeta(reportText) {
+  // Try to find month, year, property name from report heading lines
+  const lines = reportText.split('\n').slice(0,10).join(' ');
+  // Month names
+  const months = {january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',
+                  july:'07',august:'08',september:'09',october:'10',november:'11',december:'12'};
+  let month = '', year = '', property = '';
+  // Year
+  const ym = lines.match(/\b(20\d{2})\b/);
+  if (ym) year = ym[1];
+  // Month name
+  const lo = lines.toLowerCase();
+  for (const [name, num] of Object.entries(months)) {
+    if (lo.includes(name)) { month = num; break; }
+  }
+  // Property: look for text after "–" or "-" on first heading line, or first H1
+  const h1 = reportText.match(/^#\s+(.+)$/m);
+  if (h1) {
+    // Strip common suffixes like "Financial Commentary", "Monthly Report" etc.
+    property = h1[1].replace(/financial commentary|monthly report|–|-|\d{4}|january|february|march|april|may|june|july|august|september|october|november|december/gi,'').trim();
+    property = property.replace(/\s+/g,' ').trim();
+  }
+  return {month, year, property};
+}
+
+function buildFilename(month, year, property) {
+  const m = month || 'MM';
+  const y = year || 'YYYY';
+  const p = property || 'Property Name';
+  return `${m} ${y} - ${p} - Financial Commentary.docx`;
+}
+
+// ── Word export (docx via XML) ────────────────────────────────────────────
+function stripMd(text) {
+  // Remove bold/italic markers for clean plain text in Word (formatting applied via XML)
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`(.+?)`/g, '$1');
+}
+
+function inlineRuns(text, baseSz) {
+  // Returns XML runs handling **bold** and *italic* inline
+  const sz = baseSz || 20;
+  let xml = '';
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  parts.forEach(part => {
+    if (/^\*\*(.+)\*\*$/.test(part)) {
+      const t = part.slice(2,-2);
+      xml += `<w:r><w:rPr><w:b/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${escXml(t)}</w:t></w:r>`;
+    } else if (/^\*(.+)\*$/.test(part)) {
+      const t = part.slice(1,-1);
+      xml += `<w:r><w:rPr><w:i/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${escXml(t)}</w:t></w:r>`;
+    } else if (part) {
+      xml += `<w:r><w:rPr><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${escXml(part)}</w:t></w:r>`;
+    }
+  });
+  return xml || `<w:r><w:rPr><w:sz w:val="${sz}"/></w:rPr><w:t></w:t></w:r>`;
+}
+
+// Solid border definition for table cells
+const CELL_BORDER = `<w:tcBorders>
+  <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+</w:tcBorders>`;
+
+const TBL_BORDER = `<w:tblBorders>
+  <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+  <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+</w:tblBorders>`;
+
+function mdToDocxXml(md) {
+  const lines = md.split('\n');
+  let xml = '';
+  let tableRows = [], inTable = false;
+
+  function flushTable() {
+    if (!tableRows.length) { inTable = false; return; }
+    xml += `<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/>${TBL_BORDER}<w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr>`;
+    tableRows.forEach((cells, ri) => {
+      const isHeader = ri === 0;
+      const shading = isHeader
+        ? '<w:shd w:val="clear" w:color="auto" w:fill="1F3864"/>'
+        : (ri % 2 === 0 ? '<w:shd w:val="clear" w:color="auto" w:fill="EEF2F7"/>' : '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>');
+      xml += '<w:tr>';
+      cells.forEach(cell => {
+        const clean = stripMd(cell.trim());
+        const textColor = isHeader ? '<w:color w:val="FFFFFF"/>' : '<w:color w:val="000000"/>';
+        const bold = isHeader ? '<w:b/>' : '';
+        xml += `<w:tc><w:tcPr>${CELL_BORDER}${shading}</w:tcPr>`;
+        xml += `<w:p><w:pPr><w:spacing w:after="0" w:before="0"/></w:pPr>`;
+        xml += `<w:r><w:rPr>${bold}${textColor}<w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr><w:t xml:space="preserve">${escXml(clean)}</w:t></w:r>`;
+        xml += `</w:p></w:tc>`;
+      });
+      xml += '</w:tr>';
+    });
+    xml += '</w:tbl>';
+    // Spacing paragraph after table
+    xml += '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr></w:p>';
+    tableRows = []; inTable = false;
+  }
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    const isRow = /^\|.+\|$/.test(trimmed);
+    const isSep = /^\|[\s\-:|]+\|$/.test(trimmed);
+
+    if (isRow && !isSep) {
+      inTable = true;
+      tableRows.push(trimmed.split('|').slice(1,-1));
+      return;
+    }
+    if (isSep) return;
+    if (inTable) flushTable();
+
+    if (/^### /.test(line)) {
+      const t = line.replace(/^### /, '');
+      xml += `<w:p><w:pPr><w:spacing w:before="160" w:after="60"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="2E4E7B"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${escXml(stripMd(t))}</w:t></w:r></w:p>`;
+    } else if (/^## /.test(line)) {
+      const t = line.replace(/^## /, '');
+      xml += `<w:p><w:pPr><w:spacing w:before="200" w:after="80"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="1F3864"/></w:pBdr></w:pPr><w:r><w:rPr><w:b/><w:color w:val="1F3864"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t>${escXml(stripMd(t))}</w:t></w:r></w:p>`;
+    } else if (/^# /.test(line)) {
+      const t = line.replace(/^# /, '');
+      xml += `<w:p><w:pPr><w:spacing w:before="240" w:after="120"/><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="1F3864"/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:t>${escXml(stripMd(t))}</w:t></w:r></w:p>`;
+    } else if (/^---$/.test(trimmed)) {
+      xml += `<w:p><w:pPr><w:spacing w:after="80"/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="AAAAAA"/></w:pBdr></w:pPr></w:p>`;
+    } else if (/^[-*] /.test(trimmed)) {
+      const content = trimmed.replace(/^[-*] /, '');
+      xml += `<w:p><w:pPr><w:spacing w:after="40"/><w:ind w:left="360" w:hanging="180"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">• </w:t></w:r>${inlineRuns(content, 20)}</w:p>`;
+    } else if (/^\d+\. /.test(trimmed)) {
+      const content = trimmed.replace(/^\d+\. /, '');
+      const num = trimmed.match(/^(\d+)\./)[1];
+      xml += `<w:p><w:pPr><w:spacing w:after="40"/><w:ind w:left="360" w:hanging="180"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:t xml:space="preserve">${num}. </w:t></w:r>${inlineRuns(content, 20)}</w:p>`;
+    } else if (trimmed) {
+      xml += `<w:p><w:pPr><w:spacing w:after="80"/></w:pPr>${inlineRuns(trimmed, 20)}</w:p>`;
+    } else {
+      xml += `<w:p><w:pPr><w:spacing w:after="40"/></w:pPr></w:p>`;
+    }
+  });
+  if (inTable) flushTable();
+  return xml;
+}
+
+function escXml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+function buildDocx(bodyXml, title) {
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="200"/></w:pPr>
+<w:r><w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="1F3864"/></w:rPr><w:t>${escXml(title)}</w:t></w:r></w:p>
+${bodyXml}
+<w:sectPr>
+  <w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>
+</w:sectPr>
+</w:body></w:document>`;
+
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/>
+<w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/>
+<w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="1F3864"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/>
+<w:rPr><w:b/><w:sz w:val="28"/><w:color w:val="2E4E7B"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/>
+<w:rPr><w:b/><w:sz w:val="24"/><w:color w:val="3B5FA0"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="TableGrid"><w:name w:val="Table Grid"/></w:style>
+</w:styles>`;
+
+  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+  const pkgRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  return {doc, rels, styles, ct, pkgRels};
+}
+
+async function doExport() {
+  const meta = state.exportMeta;
+  const filename = buildFilename(meta.month, meta.year, meta.property);
+  const bodyXml = mdToDocxXml(state.report);
+  const title = filename.replace('.docx','');
+  const {doc, rels, styles, ct, pkgRels} = buildDocx(bodyXml, title);
+
+  try {
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', ct);
+    zip.file('_rels/.rels', pkgRels);
+    zip.file('word/document.xml', doc);
+    zip.file('word/styles.xml', styles);
+    zip.file('word/_rels/document.xml.rels', rels);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    closeModal();
+    addMsg('assistant', `✅ "${filename}" has been downloaded successfully.`);
+  } catch(err) {
+    closeModal();
+    addMsg('assistant', `Export error: ${err.message}. Please try again.`);
+  }
+}
+
+function promptFinalize() {
+  if (!state.report) return;
+  const meta = extractMeta(state.report);
+  state.exportMeta = meta;
+  document.getElementById('exportFilename').textContent = buildFilename(meta.month, meta.year, meta.property);
+  document.getElementById('exportModal').classList.add('show');
+}
+function closeModal() { document.getElementById('exportModal').classList.remove('show'); }
+
+// ── System prompt ─────────────────────────────────────────────────────────
+const SYSTEM = `You are the RW Financial Analyst v2.1, an expert real estate financial analyst for RiverWest. You analyze multifamily (MF), commercial, and manufactured housing park (MHP) property financials for one property and one month at a time.
+
+Follow ALL instructions below with strict precision.
+
+═══════════════════════════════════════════
+CORE NON-NEGOTIABLES
+═══════════════════════════════════════════
+1) One property only; one month only per run.
+2) Core required reports: Income Statement (P&L) and Balance Sheet. If either is missing: output ONLY Open Items requesting missing core reports; do not produce the full report.
+3) Validate before analysis: property/entity, period (month/year), accounting basis must match across all files. Any mismatch or tie-out conflict: STOP. Output "Conflict Detected — Analysis Stopped," describe conflicts, request re-upload.
+4) Accuracy: full precision computation; display whole dollars and one-decimal percentages. Prior period = 0 → % change = "N/A."
+5) Never mention depreciation or amortization. No arrows; use "increase/decrease." Neutral voice: "the property" + property name.
+6) Open Items mandatory at top with "Open Items: X". Show all until answered or user says "pass." Every assumption labeled "Assumption—confirm" in-text AND in Open Items. Never use "confirmed."
+7) When referring to accounts in explanations, use ONLY the account name — never the GL number or GL with name.
+8) Prior month financial amounts are sourced from the T-12 report included in the uploaded package. Pull prior month actuals from the T-12 for all month-over-month comparisons.
+9) SUPPRESSION RULE: If any data, metric, or table is suppressed due to missing information, do NOT mention the suppression in the body of the report. Log it only in Open Items, giving the user the option to provide the data, give further instruction, or pass. Once the user responds, remove that item from Open Items and act accordingly.
+10) REPORT MARKERS: You MUST always wrap your full report output between the exact tokens ---REPORT--- and ---END REPORT--- on their own lines. Any conversational text goes BEFORE the ---REPORT--- marker. Never place the markers inside code fences or quote blocks.
+
+═══════════════════════════════════════════
+REQUIRED REPORT SECTIONS (in order)
+═══════════════════════════════════════════
+1. Open Items
+2. Monthly Summary (includes Key Observations integrated within)
+3. Month-over-Month Comparison
+4. Budget Variances (only if budget provided)
+5. Financial Metrics / Analysis
+6. Key Highlights (standalone section at end of document)
+
+═══════════════════════════════════════════
+TABLE COMMENTARY RULE (ALL tables)
+═══════════════════════════════════════════
+- All variance/notes commentary lives INSIDE the table in the last column of each row.
+- No post-table commentary blocks unless explicitly specified below.
+- Each section may have ONE brief orienting sentence before its table(s), except Budget Variances which has paragraph-form commentary (see below).
+
+═══════════════════════════════════════════
+MATERIALITY + ROW CAPS
+═══════════════════════════════════════════
+- P&L MoM: ±20% threshold
+- Budget Variances (each of the four tables independently): ±20% threshold
+- Balance Sheet Movements: ±10% threshold; always include all "16…" accounts regardless
+- Cap each table at top 20 lines by absolute $ variance. Never mention truncation.
+
+═══════════════════════════════════════════
+ALWAYS-SHOWN REVENUE SECTIONS
+═══════════════════════════════════════════
+In ALL revenue tables (MoM and both Budget revenue tables), always show regardless of variance:
+- Residential Rent
+- Other Rental Income
+- Utility Income
+- Commercial Rent Income
+
+Rules:
+- Display as section-level lines (not individual GL lines).
+- Final row of every revenue table: Total Revenue (sum of all revenue for that table's period).
+- Total Revenue variance explanation summarizes the most material drivers from component rows above — no new drivers introduced.
+- If a specific account appears to drive a section variance, note in that row's explanation: "Assumption—confirm: [Account Name] appears to drive this section. Please verify." Add [Assumption Used] Open Item.
+
+═══════════════════════════════════════════
+SECTION 2: MONTHLY SUMMARY
+═══════════════════════════════════════════
+Present as flowing prose (no tables). Include:
+- Key operating drivers for the month (timing vs. structural distinctions).
+- Liquidity signals (cash position, AR/AP context).
+- If AR/AP aging provided: reference 0–30 / 31–90 / 91+ buckets and flag concentrations.
+- Capex/CIP signals when present (16… accounts).
+- Key Observations integrated naturally within the prose — weave notable patterns, anomalies, and items referencing Open Items into the narrative.
+
+═══════════════════════════════════════════
+SECTION 3: MONTH-OVER-MONTH COMPARISON
+═══════════════════════════════════════════
+Three subsections:
+
+### Revenue — Month-over-Month
+Table columns: Account | Prior Month | Current Month | $ Change | % Change | Variance Explanation
+Include always-shown revenue sections + Total Revenue row. ±20% threshold on non-required lines.
+
+### Expense — Month-over-Month
+Table columns: Account | Prior Month | Current Month | $ Change | % Change | Variance Explanation
+±20% threshold.
+
+### Balance Sheet Movements
+One orienting sentence.
+Table columns: Account | Prior Month Balance | Current Month Balance | $ Change | % Change | Notes / Explanation
+±10% threshold; always include 16… accounts. Exclude normal amortization noise (prepaids, accrual accounts incl. RE taxes, scheduled mortgage amortization). If unusual, include and log Open Item.
+
+INTERNAL ACTIVITY (after Balance Sheet Movements table):
+Present a subsection titled "### Internal Activity" immediately after the Balance Sheet Movements table.
+- Identify any receivable and payable amounts related to RiverWest-affiliated entities (RiverWest Partners, RiverWest Management, RiverWest Construction, RWMM, and similar variants). No need to note name variations.
+- Present receivables and payables as independent of each other (do not net).
+- Amounts due to these entities typically represent management fees, payroll charges, credit card reimbursements, or other internal charges.
+- For each identified amount: add an [Assumption Used] Open Item asking the user to confirm the nature and amount of the internal charge for inclusion in the final report.
+- If any of these parties are relevant to a movement in the Balance Sheet Movements table, note it inline in that row's Notes/Explanation column as well.
+- If no internal activity is identified, omit this subsection entirely.
+
+═══════════════════════════════════════════
+SECTION 4: BUDGET VARIANCES (only if budget provided)
+═══════════════════════════════════════════
+Open this section with a paragraph-form commentary block (no table) covering:
+- One paragraph for monthly performance: summarize NOI performance vs. budget for the month, identify primary revenue and expense drivers, note timing vs. structural nature.
+- One paragraph for YTD performance (if YTD budget available): same treatment.
+- NOI referenced only if explicitly shown/provided on the reports. Do not compute NOI.
+
+Then present four subsections:
+
+### Monthly Revenue — Budget vs. Actual
+Table columns: Account | Actual | Budget | $ Variance | % Variance | Variance Explanation
+Always-shown revenue sections + Total Revenue row. ±20% threshold independently.
+
+### Monthly Expense — Budget vs. Actual
+Table columns: Account | Actual | Budget | $ Variance | % Variance | Variance Explanation
+±20% threshold independently.
+
+### YTD Revenue — Budget vs. Actual
+Only if YTD budget data present and clearly labeled. If absent, log [Missing Report] Open Item per suppression rule.
+Table columns: Account | YTD Actual | YTD Budget | $ Variance | % Variance | Variance Explanation
+Always-shown revenue sections + Total Revenue row. ±20% threshold independently.
+
+### YTD Expense — Budget vs. Actual
+Table columns: Account | YTD Actual | YTD Budget | $ Variance | % Variance | Variance Explanation
+±20% threshold independently.
+
+═══════════════════════════════════════════
+SECTION 5: FINANCIAL METRICS / ANALYSIS
+═══════════════════════════════════════════
+One optional orienting sentence before the metrics table.
+Table columns: Metric | Current Month | YTD | Notes  (no TTM column)
+
+Metrics (suppress silently per suppression rule if data insufficient):
+
+1) DSCR — use NOI only if explicitly shown/provided. Do not compute NOI.
+
+2) Physical Occupancy — leased units / total units and % (e.g. "142 / 150 — 94.7%"). Prior month context in Notes if available.
+
+3) Economic Occupancy — % for current month. Note calculation basis in Notes if deterministic.
+
+4) Utility Recovery % — one row per utility type where BOTH 403xxx revenue AND matching 606xxx expense exist.
+- Suppress any utility where expense exists but no matching recovery revenue account.
+- Flag under-recovery < 50.0% in Notes.
+- GL mapping: Water 403110÷606110 | Sewer 403120÷606120 | W/S combined 403100÷606100 | Electric 403130÷606130 | Gas 403140÷606140 | Trash 403150÷606150 | Cable 403160÷606160 | Internet 403170÷606170 | Cable/Internet 403165÷606165
+- Ambiguous: suppress and add [Classification Question] Open Item.
+
+5) Debt Service Components — individual rows only, no Total row.
+- One row per principal account, one row per interest account, labeled by instrument (e.g. "Mortgage — Principal", "Mortgage — Interest"). Account names only.
+- Source priority: Cash Flow "Changes in Assets & Liabilities" → explicit CF debt service line → GL fallback.
+- Current Month and YTD per row.
+
+LEASING ACTIVITY (after metrics table):
+Subsection "### Leasing Activity" — brief structured narrative or table showing move-ins, move-outs, notices given, notices received, transfers, and other relevant leasing activity data available from the package.
+Suppress entirely per suppression rule if data not available.
+
+═══════════════════════════════════════════
+SECTION 6: KEY HIGHLIGHTS
+═══════════════════════════════════════════
+Standalone section at end of document under "## Key Highlights."
+- Bullet points summarizing: occupancy, NOI performance, significant variances, internal activity flags, capex signals, open items requiring leadership attention.
+- Do not duplicate the Open Items list. Reference thematically where relevant.
+- No actions or recommendations.
+
+═══════════════════════════════════════════
+FINALIZATION PROMPT
+═══════════════════════════════════════════
+When all Open Items are resolved (or user has passed on remaining items) and the report appears complete, proactively ask the user: "The report appears complete. Would you like to finalize and export it to Word?" Do not ask this until open items are at zero or user has explicitly passed on all remaining items.
+
+═══════════════════════════════════════════
+v2.1 SPECIAL RULES
+═══════════════════════════════════════════
+A) Property Tax, Insurance & Prepaid Amortization — Suppress & Flag Rule:
+- Property tax (real estate tax), insurance, and their associated prepaid accounts are expected to amortize in a steady, consistent monthly pattern.
+- In P&L MoM tables, Budget Variance tables, and Balance Sheet Movements: SUPPRESS these accounts when their monthly movement is consistent with a normal, steady amortization pattern (i.e., small and regular month-to-month, in line with prior months).
+- If the movement is irregular, unusually large, or inconsistent with prior months, INCLUDE the account in the relevant table(s) and log an [Assumption Used] Open Item asking the user to explain the nature and detail of the irregular movement.
+- Also suppress normal scheduled mortgage principal amortization from Balance Sheet Movements.
+- Apply the same suppress-or-flag logic to any other prepaid account that amortizes on a regular schedule.
+B) FORMATTING — Keep presentation clean. No multiple consecutive blank lines anywhere in the report. Bullet lists should have no blank lines between items. Sections should be separated by a single blank line only.
+C) Internal Activity: as described in Section 3 above.
+D) Capex: for any movement in a "16…" account, add [Classification Question] Open Item with FULL account number and name.
+
+═══════════════════════════════════════════
+OPEN ITEMS TAGS
+═══════════════════════════════════════════
+Every open item must start with: [Missing Report] [Tie-out Conflict] [Assumption Used] or [Classification Question]
+Final Open Item (always): "Anything else important about the month (operational context, one-time events, leasing/occupancy changes, capex project detail) you want included that isn't captured above?"
+Once a user answers an open item (provides data, instruction, or "pass"), remove it from the list on the next report update.
+
+═══════════════════════════════════════════
+VARIANCE DRIVER TIERING
+═══════════════════════════════════════════
+Tier 1 — Evidence-based: explicitly supported by package. No assumption label.
+Tier 2 — Plausible but unsupported: "Assumption—confirm: …" + [Assumption Used] Open Item.
+Tier 3 — Unknown: "Assumption—confirm (driver needed)" + [Assumption Used] Open Item.
+Timing = posting lag, accrual true-ups, invoice timing, seasonal lags.
+Structural = rate changes, staffing changes, contract scope changes, sustained occupancy/collections shifts.
+
+═══════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════
+- Currency: whole dollars (no cents). Percentages: one decimal.
+- Markdown formatting suitable for rendering.
+- CRITICAL: Always wrap the full report in ---REPORT--- and ---END REPORT--- on their own lines, outside any code fences. Conversational text goes BEFORE ---REPORT---. If no report update is needed, respond conversationally only with no markers.`;
+
+// ── API Key ───────────────────────────────────────────────────────────────
+function checkKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  const el = document.getElementById('apiStatus');
+  if (k.startsWith('sk-ant-') && k.length > 20) { el.textContent='✓ Ready'; el.className='api-status ok'; }
+  else { el.textContent='No Key'; el.className='api-status missing'; }
+}
+
+// ── File handling ─────────────────────────────────────────────────────────
+function ev(e,a){e.preventDefault();document.getElementById('dropZone').classList.toggle('drag',a==='drag');}
+function handleDrop(e){e.preventDefault();document.getElementById('dropZone').classList.remove('drag');handleFiles(e.dataTransfer.files);}
+function handleFiles(files){Array.from(files).forEach(f=>processFile(f));}
+function processFile(f){
+  const ext=f.name.split('.').pop().toLowerCase();
+  if(ext==='pdf'){const r=new FileReader();r.onload=e=>addFile(f.name,'pdf',e.target.result.split(',')[1]);r.readAsDataURL(f);}
+  else if(['xlsx','xls'].includes(ext)){const r=new FileReader();r.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'});let t='';wb.SheetNames.forEach(s=>{t+=`\n=== Sheet: ${s} ===\n`+XLSX.utils.sheet_to_csv(wb.Sheets[s]);});addFile(f.name,'xlsx',t);};r.readAsArrayBuffer(f);}
+  else if(ext==='csv'){const r=new FileReader();r.onload=e=>addFile(f.name,'csv',e.target.result);r.readAsText(f);}
+}
+function addFile(name,type,content){if(state.files.find(f=>f.name===name))return;state.files.push({name,type,content});renderFiles();}
+function removeFile(name){state.files=state.files.filter(f=>f.name!==name);renderFiles();}
+function renderFiles(){
+  document.getElementById('fileList').innerHTML=state.files.map(f=>`
+    <div class="file-chip"><span class="ftype">${f.type.toUpperCase()}</span>
+    <span class="fname" title="${f.name}">${f.name}</span>
+    <span class="rem" onclick="removeFile('${f.name}')">✕</span></div>`).join('');
+}
+function toggleManual(){document.getElementById('manualArea').style.display=document.getElementById('manualToggle').checked?'block':'none';}
+
+// ── Chat ──────────────────────────────────────────────────────────────────
+function addMsg(role,text){
+  const el=document.getElementById('chatArea');
+  const d=document.createElement('div');d.className=`msg ${role}`;
+  const preview=text.length>400?text.slice(0,400)+'…':text;
+  d.innerHTML=`<div class="msg-label">${role==='user'?'You':'RW Analyst'}</div><div class="bubble">${escHtml(preview)}</div>`;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+function showTyping(){const el=document.getElementById('chatArea');const d=document.createElement('div');d.id='typing';d.innerHTML=`<div class="typing"><span></span><span></span><span></span></div>`;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function hideTyping(){const t=document.getElementById('typing');if(t)t.remove();}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function send(){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  if(!apiKey.startsWith('sk-ant-')){alert('Please enter a valid Anthropic API key first.');return;}
+  const input=document.getElementById('userInput');
+  const txt=input.value.trim();
+  const manual=document.getElementById('manualText').value.trim();
+
+  let userContent=[];
+  if(state.files.length>0&&state.history.length===0){
+    state.files.forEach(f=>{
+      if(f.type==='pdf') userContent.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:f.content}});
+      else userContent.push({type:'text',text:`=== File: ${f.name} ===\n${f.content}`});
+    });
+  }
+  if(manual&&state.history.length===0) userContent.push({type:'text',text:`=== Manual Notes / Additional Data ===\n${manual}`});
+
+  const msgText=txt||(state.history.length===0?'Please analyze these financial reports and produce the RiverWest v2.1 report.':'');
+  if(!msgText&&userContent.length===0)return;
+  if(msgText) userContent.push({type:'text',text:msgText});
+
+  input.value='';
+  document.getElementById('sendBtn').disabled=true;
+  addMsg('user',txt||(state.files.length>0?`[Uploaded ${state.files.length} file(s)] Analyze these reports.`:''));
+  state.history.push({role:'user',content:userContent});
+  showTyping();
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,system:SYSTEM,messages:state.history})
+    });
+    const data=await resp.json();
+    hideTyping();
+
+    if(data.error){addMsg('assistant',`Error: ${data.error.message}`);state.history.pop();document.getElementById('sendBtn').disabled=false;return;}
+
+    const fullText=data.content.map(b=>b.text||'').join('');
+    state.history.push({role:'assistant',content:fullText});
+
+    // Robust marker extraction — strip surrounding whitespace, code fences
+    const cleaned=fullText.replace(/```[a-z]*\n?/gi,'');
+    const repMatch=cleaned.match(/---REPORT---\s*([\s\S]*?)\s*---END REPORT---/);
+    let chatText=fullText.replace(/```[a-z]*\n?/gi,'').replace(/---REPORT---[\s\S]*?---END REPORT---/,'').trim();
+
+    if(repMatch){
+      state.report=repMatch[1].trim();
+      renderReport();
+      document.getElementById('reportTitle').textContent='Current Report';
+      document.getElementById('copyBtn').style.display='inline-block';
+      document.getElementById('finalizeBtn').style.display='inline-block';
+      const emp=document.getElementById('emptyReport');
+      if(emp) emp.style.display='none';
+    }
+    if(chatText) addMsg('assistant',chatText);
+    else if(repMatch) addMsg('assistant','Report updated — review the right panel.');
+
+  }catch(err){
+    hideTyping();
+    addMsg('assistant',`Network error: ${err.message}`);
+    state.history.pop();
+  }
+  document.getElementById('sendBtn').disabled=false;
+}
+
+// ── Report view ───────────────────────────────────────────────────────────
+function setView(v){
+  state.view=v;
+  document.getElementById('vPreview').className='view-btn'+(v==='preview'?' active':'');
+  document.getElementById('vEdit').className='view-btn'+(v==='edit'?' active':'');
+  renderReport();
+}
+function renderReport(){
+  const c=document.getElementById('reportContent');
+  if(!state.report)return;
+  const emp=document.getElementById('emptyReport');if(emp)emp.style.display='none';
+  if(state.view==='edit'){
+    c.innerHTML=`<textarea class="report-editor" oninput="state.report=this.value">${escHtml(state.report)}</textarea>`;
+  }else{
+    c.innerHTML=`<div class="report-preview">${mdToHtml(state.report)}</div>`;
+  }
+}
+function mdToHtml(md){
+  let h=md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/^---$/gm,'<hr>')
+    .replace(/(\|.+\|\n)+/g,m=>{
+      const rows=m.trim().split('\n').filter(r=>!/^\|[-:| ]+\|$/.test(r));
+      if(!rows.length)return m;
+      const toRow=(r,tag)=>'<tr>'+r.split('|').slice(1,-1).map(c=>`<${tag}>${c.trim()}</${tag}>`).join('')+'</tr>';
+      return `<table>${toRow(rows[0],'th')}${rows.slice(1).map(r=>toRow(r,'td')).join('')}</table>`;
+    })
+    .replace(/(^- .+\n?)+/gm,m=>'<ul>'+m.replace(/^- (.+)$/gm,'<li>$1</li>')+'</ul>')
+    .replace(/(^\d+\. .+\n?)+/gm,m=>'<ol>'+m.replace(/^\d+\. (.+)$/gm,'<li>$1</li>')+'</ol>')
+    .replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>');
+  return `<p>${h}</p>`;
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────
+function copyReport(){
+  if(!state.report)return;
+  navigator.clipboard.writeText(state.report).then(()=>{
+    const btn=document.getElementById('copyBtn');
+    btn.textContent='✓ Copied!';setTimeout(()=>btn.textContent='📋 Copy',2000);
+  });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────
+function clearAll(){
+  if(!confirm('Reset everything? This clears all files, chat, and the report.'))return;
+  state.files=[];state.history=[];state.report='';
+  renderFiles();
+  document.getElementById('chatArea').innerHTML='';
+  document.getElementById('reportContent').innerHTML=`<div class="empty-report" id="emptyReport"><div class="big">📊</div><p>Upload reports and start the conversation<br>to generate your RiverWest analysis.</p></div>`;
+  document.getElementById('reportTitle').textContent='Report will appear here after first analysis';
+  document.getElementById('copyBtn').style.display='none';
+  document.getElementById('finalizeBtn').style.display='none';
+  document.getElementById('manualText').value='';
+  document.getElementById('manualToggle').checked=false;
+  document.getElementById('manualArea').style.display='none';
+  document.getElementById('userInput').value='';
+}
+</script>
+</body>
+</html>
